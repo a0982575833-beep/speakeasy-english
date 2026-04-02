@@ -612,15 +612,13 @@ function initRecog(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR)return null;
   recog=new SR();
-  recog.lang=voiceLang;recog.interimResults=true;recog.continuous=false;
+  recog.lang=voiceLang;recog.interimResults=true;recog.continuous=true;
   recog.onresult=e=>{
-    const t=e.results[0][0].transcript;
-    $('chatInp').value=t;
+    // Combine all results (continuous mode produces multiple)
+    let full='';
+    for(let i=0;i<e.results.length;i++) full+=e.results[i][0].transcript;
+    $('chatInp').value=full;
     $('chatInp').style.height='40px';$('chatInp').style.height=Math.min($('chatInp').scrollHeight,80)+'px';
-    if(e.results[0].isFinal){
-      $('chatInp').focus();
-      toast('Check & tap ➤ to send 確認後點送出');
-    }
   };
   recog.onerror=e=>{
     console.warn('Speech error:',e.error);
@@ -641,6 +639,7 @@ function startVoice(){
 function stopVoice(){
   if(recog)try{recog.stop()}catch(e){}
   $('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening');
+  if($('chatInp').value.trim())setTimeout(()=>{$('chatInp').focus();toast('Check & tap ➤ 確認後點送出')},200);
 }
 
 function speak(text,rate){
