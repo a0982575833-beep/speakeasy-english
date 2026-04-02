@@ -319,6 +319,7 @@ button{font-family:inherit}
       <button class="v-btn" id="vBtn">🎤</button>
       <button class="lang-tog" id="langTog">EN</button>
       <button class="lang-tog" id="ttsToggle">🔊</button>
+      <button class="lang-tog" id="autoSendTog" style="font-size:10px">AUTO</button>
     </div>
   </div>
 
@@ -348,7 +349,7 @@ let S={
   stats:JSON.parse(localStorage.getItem(K+'stats')||'{"streak":0,"xp":0,"chats":0,"scen":0,"shad":0,"last":"","mis":{}}'),
   shIdx:+(localStorage.getItem(K+'shIdx'))||0
 };
-let conv=[], busy=false, recog=null, voiceLang='en-US', ttsOn=localStorage.getItem(K+'tts')!=='off';
+let conv=[], busy=false, recog=null, voiceLang='en-US', ttsOn=localStorage.getItem(K+'tts')!=='off', autoSend=localStorage.getItem(K+'autoSend')!=='off';
 
 function sv(k,v){localStorage.setItem(K+k,typeof v==='object'?JSON.stringify(v):String(v))}
 
@@ -437,6 +438,14 @@ function init(){
     $('ttsToggle').classList.toggle('cn',!ttsOn);
     if(!ttsOn&&window.speechSynthesis)speechSynthesis.cancel();
     toast(ttsOn?'Voice ON 語音開':'Voice OFF 語音關 (silent mode 靜音)');
+  };
+  // Auto-send toggle
+  $('autoSendTog').classList.toggle('cn',!autoSend);
+  $('autoSendTog').onclick=()=>{
+    autoSend=!autoSend;
+    sv('autoSend',autoSend?'on':'off');
+    $('autoSendTog').classList.toggle('cn',!autoSend);
+    toast(autoSend?'Auto-send ON 放開即送出':'Auto-send OFF 先檢查再送');
   };
   // Language toggle for voice
   $('langTog').onclick=()=>{
@@ -639,7 +648,12 @@ function startVoice(){
 function stopVoice(){
   if(recog)try{recog.stop()}catch(e){}
   $('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening');
-  if($('chatInp').value.trim())setTimeout(()=>{$('chatInp').focus();toast('Check & tap ➤ 確認後點送出')},200);
+  setTimeout(()=>{
+    const txt=$('chatInp').value.trim();
+    if(!txt)return;
+    if(autoSend){sendMsg(txt)}
+    else{$('chatInp').focus();toast('Check & tap ➤ 確認後點送出')}
+  },300);
 }
 
 function speak(text,rate){
