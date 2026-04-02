@@ -92,6 +92,7 @@ button{font-family:inherit}
 .inp-row{display:flex;gap:6px;align-items:flex-end;margin-bottom:6px}
 .inp{flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:22px;font-size:15px;background:var(--bg);color:var(--text);resize:none;height:40px;max-height:80px;line-height:1.3;font-family:inherit}
 .inp:focus{outline:none;border-color:var(--blue)}
+.inp.listening{border-color:var(--error);animation:pulse 1s infinite}
 .send{width:40px;height:40px;border:none;background:var(--blue);color:#fff;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0}
 .send:active{transform:scale(.9)}
 .send:disabled{opacity:.4}
@@ -596,11 +597,15 @@ function initRecog(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR)return null;
   recog=new SR();
-  recog.lang=voiceLang;recog.interimResults=false;recog.continuous=false;
+  recog.lang=voiceLang;recog.interimResults=true;recog.continuous=false;
   recog.onresult=e=>{
     const t=e.results[0][0].transcript;
     $('chatInp').value=t;
-    sendMsg(t);
+    $('chatInp').style.height='40px';$('chatInp').style.height=Math.min($('chatInp').scrollHeight,80)+'px';
+    if(e.results[0].isFinal){
+      $('chatInp').focus();
+      toast('Check & tap ➤ to send 確認後點送出');
+    }
   };
   recog.onerror=e=>{
     console.warn('Speech error:',e.error);
@@ -608,7 +613,7 @@ function initRecog(){
     if(e.error==='not-allowed')toast('Allow microphone 請允許麥克風');
     else if(e.error==='no-speech')toast('No speech detected 未偵測到語音');
   };
-  recog.onend=()=>$('vBtn').classList.remove('rec');
+  recog.onend=()=>{$('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening')};
   return recog;
 }
 
@@ -616,11 +621,11 @@ function startVoice(){
   if(!recog)initRecog();
   if(!recog){toast('Voice not supported 語音不支援');return}
   recog.lang=voiceLang;
-  try{recog.start();$('vBtn').classList.add('rec')}catch(e){}
+  try{recog.start();$('vBtn').classList.add('rec');$('chatInp').classList.add('listening')}catch(e){}
 }
 function stopVoice(){
   if(recog)try{recog.stop()}catch(e){}
-  $('vBtn').classList.remove('rec');
+  $('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening');
 }
 
 function speak(text,rate){
