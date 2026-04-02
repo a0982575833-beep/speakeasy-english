@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2563EB">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>SpeakEasy - AI English Coach</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#2563EB;--blue-light:#3B82F6;--blue-dark:#1D4ED8;
+  --bg:#F8FAFC;--bg-card:#FFFFFF;--text:#1E293B;--text-light:#64748B;
+  --border:#E2E8F0;--success:#10B981;--error:#EF4444;--warning:#F59E0B;
+  --radius:16px;--radius-sm:10px;--shadow:0 2px 12px rgba(0,0,0,0.08);
+  --nav-h:68px;--header-h:52px;--input-h:120px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+[data-theme="dark"]{
+  --bg:#0F172A;--bg-card:#1E293B;--text:#F1F5F9;--text-light:#94A3B8;
+  --border:#334155;--shadow:0 2px 12px rgba(0,0,0,0.3);
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+
+/* ===== SETUP ===== */
+.setup{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.setup.hidden{display:none}
+.setup-logo{font-size:56px;margin-bottom:12px}
+.setup h1{font-size:28px;font-weight:700;color:var(--blue);margin-bottom:4px}
+.setup p{color:var(--text-light);margin-bottom:24px;line-height:1.5}
+.s-input{width:100%;max-width:380px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:16px;background:var(--bg-card);color:var(--text);margin-bottom:12px;text-align:center}
+.s-input:focus{outline:none;border-color:var(--blue)}
+.s-btn{width:100%;max-width:380px;padding:15px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:17px;font-weight:600;cursor:pointer}
+.s-btn:disabled{opacity:.5}
+.s-err{color:var(--error);margin-top:8px;font-size:14px;min-height:20px}
+.s-guide{margin-top:20px;text-align:left;max-width:380px;background:var(--bg-card);padding:14px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.s-guide h3{font-size:13px;color:var(--blue);margin-bottom:6px}
+.s-guide ol{padding-left:18px;font-size:13px;color:var(--text-light);line-height:1.8}
+.s-guide a{color:var(--blue)}
+
+/* ===== APP SHELL ===== */
+.app{display:none;flex-direction:column;height:100%}
+.app.show{display:flex}
+
+/* Header */
+.hdr{height:var(--header-h);display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:var(--bg-card);border-bottom:1px solid var(--border);flex-shrink:0;z-index:10}
+.hdr-l{display:flex;align-items:center;gap:8px}
+.hdr-avatar{width:30px;height:30px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700}
+.hdr-name{font-weight:600;font-size:15px}
+.hdr-r{display:flex;align-items:center;gap:4px}
+.hdr-btn{width:34px;height:34px;border:none;background:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-light);font-size:16px}
+.hdr-btn:active{background:var(--border)}
+.badge{font-size:11px;padding:2px 8px;border-radius:12px;background:var(--success);color:#fff;font-weight:600;cursor:pointer;user-select:none}
+.badge.strict{background:var(--error)}
+
+/* Main */
+.main{flex:1;overflow:hidden;position:relative}
+.tab{position:absolute;inset:0;overflow-y:auto;padding:10px;display:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.tab.on{display:block}
+#tab-chat{padding-bottom:calc(var(--input-h) + 8px)}
+#tab-daily,#tab-shadow,#tab-words,#tab-stats{padding-bottom:16px}
+
+/* ===== CHAT ===== */
+.msgs{display:flex;flex-direction:column;gap:8px;min-height:100%}
+.m{max-width:85%;animation:fi .25s}
+.m.u{align-self:flex-end}
+.m.a{align-self:flex-start}
+.bbl{padding:11px 14px;border-radius:var(--radius);font-size:15px;line-height:1.6;word-break:break-word}
+.m.u .bbl{background:var(--blue);color:#fff;border-bottom-right-radius:4px}
+.m.a .bbl{background:var(--bg-card);border:1px solid var(--border);border-bottom-left-radius:4px}
+.m-cn{font-size:13px;color:var(--text-light);padding:2px 4px 0;line-height:1.4}
+.m.u .m-cn{text-align:right}
+.m-acts{display:flex;gap:6px;padding:2px 4px;flex-wrap:wrap}
+.m-act{font-size:12px;color:var(--text-light);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:6px}
+.m-act:active{background:var(--border)}
+
+/* Correction */
+.corr{background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--error);border-radius:var(--radius-sm);padding:12px;margin:6px 0;max-width:92%;animation:fi .25s}
+.corr-h{font-size:12px;font-weight:600;color:var(--error);margin-bottom:6px}
+.corr-w{color:var(--error);font-size:14px;text-decoration:line-through;margin-bottom:3px}
+.corr-r{color:var(--success);font-size:14px;font-weight:600;margin-bottom:6px}
+.corr-t{font-size:13px;color:var(--text-light);background:var(--bg);padding:8px;border-radius:8px;line-height:1.5}
+.corr-listen{margin-top:6px;font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer}
+
+/* Input Area */
+.inp-area{position:fixed;left:0;right:0;bottom:var(--nav-h);background:var(--bg-card);border-top:1px solid var(--border);padding:8px 10px calc(2px + var(--safe-b));z-index:5;display:none}
+.inp-area.on{display:block}
+.inp-row{display:flex;gap:6px;align-items:flex-end;margin-bottom:6px}
+.inp{flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:22px;font-size:15px;background:var(--bg);color:var(--text);resize:none;height:40px;max-height:80px;line-height:1.3;font-family:inherit}
+.inp:focus{outline:none;border-color:var(--blue)}
+.send{width:40px;height:40px;border:none;background:var(--blue);color:#fff;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0}
+.send:active{transform:scale(.9)}
+.send:disabled{opacity:.4}
+.v-row{display:flex;align-items:center;justify-content:center;gap:14px}
+.v-btn{width:50px;height:50px;border:none;background:var(--blue);color:#fff;border-radius:50%;font-size:22px;cursor:pointer;transition:all .15s;touch-action:none}
+.v-btn.rec{background:var(--error);animation:pulse 1s infinite}
+.v-btn:active{transform:scale(.92)}
+.spd{display:flex;gap:1px;background:var(--border);border-radius:16px;padding:2px;overflow:hidden}
+.spd button{padding:5px 10px;border:none;background:var(--bg);font-size:11px;cursor:pointer;color:var(--text-light);font-weight:500}
+.spd button.on{background:var(--blue);color:#fff}
+.spd button:first-child{border-radius:14px 0 0 14px}
+.spd button:last-child{border-radius:0 14px 14px 0}
+
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* Loading */
+.ldg{display:flex;gap:4px;padding:12px 14px}
+.ldg span{width:7px;height:7px;background:var(--text-light);border-radius:50%;animation:lb .6s infinite alternate}
+.ldg span:nth-child(2){animation-delay:.2s}
+.ldg span:nth-child(3){animation-delay:.4s}
+@keyframes lb{to{opacity:.3;transform:translateY(-3px)}}
+
+/* ===== DAILY ===== */
+.d-head{text-align:center;padding:12px 0 10px}
+.d-date{font-size:13px;color:var(--text-light)}
+.d-title{font-size:18px;font-weight:700;margin-top:2px}
+.sc{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.sc:active{transform:scale(.99)}
+.sc-icon{font-size:26px;margin-bottom:6px}
+.sc-cat{font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;margin-bottom:4px}
+.sc-txt{font-size:15px;font-weight:500;line-height:1.5;margin-bottom:3px}
+.sc-cn{font-size:13px;color:var(--text-light);margin-bottom:10px}
+.sc-ph{background:var(--bg);border-radius:8px;padding:8px;margin-bottom:10px}
+.sc-ph-t{font-size:11px;font-weight:600;color:var(--text-light);margin-bottom:4px}
+.sc-ph-i{font-size:13px;margin-bottom:2px}
+.sc-go{width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer}
+.sc.done{opacity:.7}
+.sc.done .sc-go{background:var(--success)}
+
+/* ===== SHADOW ===== */
+.sh-wrap{display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:16px;padding-bottom:80px}
+.sh-card{width:100%;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+.sh-lbl{font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;margin-bottom:6px}
+.sh-en{font-size:17px;font-weight:500;line-height:1.5;margin-bottom:4px}
+.sh-cn{font-size:14px;color:var(--text-light)}
+.sh-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.sh-b{padding:10px 20px;border:none;border-radius:22px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px}
+.sh-b:active{transform:scale(.95)}
+.sh-listen{background:var(--blue);color:#fff}
+.sh-speak{background:var(--success);color:#fff}
+.sh-next{background:var(--bg);border:1.5px solid var(--border);color:var(--text)}
+.sh-res{width:100%;text-align:left}
+.sh-att{font-size:15px;margin-bottom:6px}
+.sh-diff{padding:8px;background:var(--bg);border-radius:8px;font-size:14px;line-height:1.7}
+.sh-diff .ok{color:var(--success);font-weight:500}
+.sh-diff .no{color:var(--error);text-decoration:line-through}
+.sh-lvl{font-size:13px;color:var(--text-light);display:flex;align-items:center;gap:8px;width:100%}
+.sh-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.sh-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .3s}
+
+/* ===== WORDS ===== */
+.w-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.w-title{font-size:17px;font-weight:700}
+.w-cnt{font-size:13px;color:var(--text-light)}
+.w-tabs{display:flex;gap:3px;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:10px}
+.w-tab{flex:1;padding:7px;border:none;background:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-light)}
+.w-tab.on{background:var(--bg-card);color:var(--text);box-shadow:var(--shadow)}
+.wc{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px}
+.wc-en{font-size:15px;font-weight:600;margin-bottom:1px}
+.wc-type{font-size:11px;color:var(--blue);font-weight:500}
+.wc-cn{font-size:13px;color:var(--text-light);margin-bottom:4px}
+.wc-ex{font-size:12px;color:var(--text-light);font-style:italic;padding:6px;background:var(--bg);border-radius:6px}
+.wc-acts{display:flex;gap:6px;margin-top:6px}
+.wc-a{font-size:11px;color:var(--text-light);background:none;border:1px solid var(--border);padding:3px 8px;border-radius:10px;cursor:pointer}
+.wc-a:active{border-color:var(--blue);color:var(--blue)}
+.w-empty{text-align:center;padding:32px 16px;color:var(--text-light)}
+.w-empty-ico{font-size:40px;margin-bottom:8px}
+
+/* Flashcard */
+.fc{perspective:800px;width:100%;max-width:340px;height:200px;margin:16px auto;cursor:pointer}
+.fc-in{position:relative;width:100%;height:100%;transition:transform .4s;transform-style:preserve-3d}
+.fc.flip .fc-in{transform:rotateY(180deg)}
+.fc-f,.fc-b{position:absolute;inset:0;backface-visibility:hidden;border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;border:2px solid var(--border)}
+.fc-f{background:var(--blue);color:#fff}
+.fc-b{background:var(--bg-card);transform:rotateY(180deg)}
+.fc-word{font-size:22px;font-weight:700;margin-bottom:6px}
+.fc-hint{font-size:13px;opacity:.8}
+.fc-mean{font-size:18px;font-weight:600;margin-bottom:6px}
+.fc-ex{font-size:13px;color:var(--text-light);text-align:center}
+.rv-ctrl{display:flex;gap:10px;justify-content:center;margin-top:12px}
+.rv-b{padding:10px 22px;border:none;border-radius:18px;font-size:14px;font-weight:600;cursor:pointer}
+.rv-know{background:var(--success);color:#fff}
+.rv-again{background:var(--error);color:#fff}
+
+/* ===== STATS ===== */
+.st-wrap{padding-bottom:20px}
+.st-streak{text-align:center;padding:20px 0;background:var(--bg-card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:12px}
+.st-num{font-size:44px;font-weight:800;color:var(--blue)}
+.st-lbl{font-size:13px;color:var(--text-light)}
+.st-xp{text-align:center;font-size:13px;color:var(--text-light);margin-bottom:12px}
+.st-xp b{color:var(--warning);font-size:16px}
+.st-lvl{text-align:center;padding:10px;background:linear-gradient(135deg,var(--blue),var(--blue-dark));border-radius:var(--radius-sm);color:#fff;margin-bottom:12px}
+.st-lvl-n{font-size:16px;font-weight:700}
+.st-lvl-bar{height:5px;background:rgba(255,255,255,.3);border-radius:3px;margin-top:6px;overflow:hidden}
+.st-lvl-fill{height:100%;background:#fff;border-radius:3px}
+.st-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.st-c{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.st-c-n{font-size:22px;font-weight:700;color:var(--blue)}
+.st-c-l{font-size:11px;color:var(--text-light);margin-top:1px}
+.st-mis{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px}
+.st-mis h3{font-size:13px;font-weight:600;margin-bottom:6px}
+.mi{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+.mi:last-child{border:none}
+
+/* ===== NAV ===== */
+.nav{height:var(--nav-h);display:flex;background:var(--bg-card);border-top:1px solid var(--border);flex-shrink:0;z-index:10;padding-bottom:var(--safe-b)}
+.nav-i{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:var(--text-light);border:none;background:none;font-family:inherit;transition:color .15s}
+.nav-i.on{color:var(--blue)}
+.nav-ic{font-size:20px}
+.nav-lb{font-size:10px;font-weight:500}
+
+/* Toast */
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 18px;border-radius:20px;font-size:13px;z-index:200;animation:ti .2s,to .2s 2s forwards;white-space:nowrap;pointer-events:none}
+@keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes to{to{opacity:0;transform:translateX(-50%) translateY(-8px)}}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Desktop */
+@media(min-width:540px){
+  .main{max-width:480px;margin:0 auto;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  .inp-area{max-width:480px;left:50%;transform:translateX(-50%)}
+  .nav{max-width:480px;margin:0 auto}
+  .hdr{max-width:480px;margin:0 auto}
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div class="setup" id="setup">
+  <div class="setup-logo">🎯</div>
+  <h1>SpeakEasy</h1>
+  <p>Your AI English Speaking Coach<br>你的 AI 英語口說教練</p>
+  <input class="s-input" id="apiKeyInput" type="password" placeholder="Paste Gemini API Key 貼上金鑰" autocomplete="off">
+  <button class="s-btn" id="setupBtn">Start Learning 開始學習</button>
+  <div class="s-err" id="setupErr"></div>
+  <div class="s-guide">
+    <h3>How to get free API key 如何取得免費金鑰:</h3>
+    <ol>
+      <li>Go to 前往 <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></li>
+      <li>Sign in with Google 用 Google 登入</li>
+      <li>Click "Create API Key" 點「建立金鑰」</li>
+      <li>Copy & paste here 複製貼到上方</li>
+    </ol>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="hdr-avatar">N</div>
+      <span class="hdr-name">NingNing</span>
+      <span class="badge" id="modeBadge">Gentle</span>
+    </div>
+    <div class="hdr-r">
+      <button class="hdr-btn" id="themeBtn" title="Theme">🌙</button>
+      <button class="hdr-btn" id="newChatBtn" title="New Chat">✨</button>
+      <button class="hdr-btn" id="settingsBtn" title="Settings">⚙️</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="tab on" id="tab-chat"><div class="msgs" id="msgs"></div></div>
+    <div class="tab" id="tab-daily">
+      <div class="d-head"><div class="d-date" id="dDate"></div><div class="d-title">Today's Scenarios 今日情境</div></div>
+      <div id="dScenarios"><div style="text-align:center;padding:30px;color:var(--text-light)">📋<br>Loading... 載入中...</div></div>
+    </div>
+    <div class="tab" id="tab-shadow">
+      <div class="sh-wrap">
+        <div class="sh-lvl"><span id="shLvlText">Level 1 — Basics</span><div class="sh-bar"><div class="sh-fill" id="shProg" style="width:0%"></div></div></div>
+        <div class="sh-card"><div class="sh-lbl">NingNing says:</div><div class="sh-en" id="shEn">Loading...</div><div class="sh-cn" id="shCn"></div></div>
+        <div class="sh-btns"><button class="sh-b sh-listen" id="shListenBtn">🔊 Listen 聽</button><button class="sh-b sh-speak" id="shSpeakBtn">🎤 Your Turn 換你</button></div>
+        <div class="sh-card sh-res" id="shRes" style="display:none"><div class="sh-lbl">Your attempt 你的嘗試:</div><div class="sh-att" id="shAtt"></div><div class="sh-diff" id="shDiff"></div></div>
+        <button class="sh-b sh-next" id="shNextBtn">Next → 下一句</button>
+      </div>
+    </div>
+    <div class="tab" id="tab-words">
+      <div class="w-hdr"><div class="w-title">Vocabulary 生詞本</div><div class="w-cnt" id="wCnt">0 words</div></div>
+      <div class="w-tabs"><button class="w-tab on" data-wt="list">Words 單字</button><button class="w-tab" data-wt="phrases">Phrases 句庫</button><button class="w-tab" data-wt="review">Review 複習</button></div>
+      <div id="wList"></div><div id="wPhrases" style="display:none"></div><div id="wReview" style="display:none"></div>
+    </div>
+    <div class="tab" id="tab-stats">
+      <div class="st-wrap">
+        <div class="st-streak"><div class="st-num" id="stStreak">0</div><div class="st-lbl">Day Streak 🔥 連續天數</div></div>
+        <div class="st-xp">Total XP: <b id="stXP">0</b></div>
+        <div class="st-lvl"><div class="st-lvl-n" id="stLvl">🌱 Starter</div><div class="st-lvl-bar"><div class="st-lvl-fill" id="stLvlFill" style="width:0%"></div></div></div>
+        <div class="st-grid">
+          <div class="st-c"><div class="st-c-n" id="stChats">0</div><div class="st-c-l">Messages 訊息</div></div>
+          <div class="st-c"><div class="st-c-n" id="stScen">0</div><div class="st-c-l">Scenarios 情境</div></div>
+          <div class="st-c"><div class="st-c-n" id="stShad">0</div><div class="st-c-l">Shadows 跟讀</div></div>
+          <div class="st-c"><div class="st-c-n" id="stWords">0</div><div class="st-c-l">Words 生詞</div></div>
+        </div>
+        <div class="st-mis"><h3>Common Mistakes 常犯錯誤</h3><div id="misList"><div style="color:var(--text-light);font-size:12px;padding:6px 0">Chat to start tracking! 開始聊天就會追蹤！</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="inp-area on" id="inpArea">
+    <div class="inp-row">
+      <textarea class="inp" id="chatInp" rows="1" placeholder="Type English here... 打英文..."></textarea>
+      <button class="send" id="sendBtn">➤</button>
+    </div>
+    <div class="v-row">
+      <div class="spd" id="spdCtrl">
+        <button data-s="0.7">Slow</button>
+        <button data-s="1" class="on">Normal</button>
+        <button data-s="1.3">Fast</button>
+      </div>
+      <button class="v-btn" id="vBtn">🎤</button>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-i on" data-tab="chat"><span class="nav-ic">💬</span><span class="nav-lb">Chat</span></button>
+    <button class="nav-i" data-tab="daily"><span class="nav-ic">📋</span><span class="nav-lb">Daily</span></button>
+    <button class="nav-i" data-tab="shadow"><span class="nav-ic">🎤</span><span class="nav-lb">Shadow</span></button>
+    <button class="nav-i" data-tab="words"><span class="nav-ic">📖</span><span class="nav-lb">Words</span></button>
+    <button class="nav-i" data-tab="stats"><span class="nav-ic">📊</span><span class="nav-lb">Stats</span></button>
+  </nav>
+</div>
+
+<script>
+/* ===== STATE ===== */
+const K='se_';
+const $=s=>document.getElementById(s);
+const $$=s=>document.querySelectorAll(s);
+let S={
+  key:localStorage.getItem(K+'key')||'',
+  mode:localStorage.getItem(K+'mode')||'gentle',
+  speed:+(localStorage.getItem(K+'speed'))||1,
+  theme:localStorage.getItem(K+'theme')||'light',
+  hist:JSON.parse(localStorage.getItem(K+'hist')||'[]'),
+  vocab:JSON.parse(localStorage.getItem(K+'vocab')||'[]'),
+  phrases:JSON.parse(localStorage.getItem(K+'phr')||'[]'),
+  daily:JSON.parse(localStorage.getItem(K+'daily')||'{}'),
+  stats:JSON.parse(localStorage.getItem(K+'stats')||'{"streak":0,"xp":0,"chats":0,"scen":0,"shad":0,"last":"","mis":{}}'),
+  shIdx:+(localStorage.getItem(K+'shIdx'))||0
+};
+let conv=[], busy=false, recog=null;
+
+function sv(k,v){localStorage.setItem(K+k,typeof v==='object'?JSON.stringify(v):String(v))}
+
+/* ===== SYSTEM PROMPT (dynamic) ===== */
+function getSysPrompt(){
+  return `You are NingNing, a warm and patient English speaking coach for Roy — a TMGM Client Manager in Taipei with beginner-level English. He can read simple sentences but struggles to speak.
+
+IMPORTANT RULES:
+1. ALWAYS reply like this:
+   - English response (keep it simple, max 3 sentences for main reply)
+   - Then on new line: 📝 Chinese translation
+
+2. CORRECTION (CRITICAL — this is the main feature):
+   If Roy makes ANY grammar, vocabulary, tense, article, preposition, or expression error:
+   ⚠️CORRECTION:
+   ❌ what he said
+   ✅ correct version
+   💡 why (EN, simple)
+   📝 why (CN)
+
+3. VOCABULARY — when you use a word Roy might not know:
+   📚VOCAB: word (pos) = Chinese | example sentence
+
+4. Mode: ${S.mode==='gentle'?'GENTLE — only correct major errors, be extra encouraging':'STRICT — correct everything including nuance, small grammar, articles'}
+
+5. Topics: TMGM work (forex, client management, compliance, video calls, reports, emails, meetings), social (meeting international friends, small talk, Taipei life, food, weekend plans), daily life
+
+6. Be encouraging! Say "Good try!", "Almost!", "Nice!" Never say "wrong". If Roy writes Chinese, gently help him say it in English.
+
+7. Keep responses SHORT and conversational — like a real tutor chatting, not writing essays.`;
+}
+
+/* ===== GEMINI API ===== */
+async function gem(messages, key){
+  const k=key||S.key;
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      systemInstruction:{parts:[{text:getSysPrompt()}]},
+      contents:messages,
+      generationConfig:{temperature:0.8,maxOutputTokens:800}
+    })
+  });
+  if(!r.ok){
+    const e=await r.text();
+    if(r.status===429){
+      if(e.includes('limit: 0')||e.includes('quota'))
+        throw new Error('Quota exhausted 額度用完。Go to aistudio.google.com/apikey to create a NEW key 請建立新金鑰');
+      throw new Error('Rate limited 請求太頻繁。Wait 1 min 等一分鐘再試');
+    }
+    if(r.status===400)throw new Error('Bad request 請求錯誤。Check API key format 檢查金鑰格式');
+    if(r.status===403)throw new Error('Key not authorized 金鑰未授權。Enable Generative Language API 啟用 API');
+    throw new Error(`API error ${r.status}`);
+  }
+  const d=await r.json();
+  const t=d.candidates?.[0]?.content?.parts?.[0]?.text;
+  if(!t){
+    const block=d.candidates?.[0]?.finishReason;
+    if(block==='SAFETY')throw new Error('Response filtered 回覆被過濾。Try rephrasing 換個說法');
+    throw new Error('Empty response 空回覆');
+  }
+  return t;
+}
+
+/* ===== INIT ===== */
+function init(){
+  if(S.theme==='dark')document.documentElement.setAttribute('data-theme','dark');
+  // Events
+  $('setupBtn').onclick=submitKey;
+  $('apiKeyInput').onkeydown=e=>{if(e.key==='Enter')submitKey()};
+  $('modeBadge').onclick=toggleMode;
+  $('themeBtn').onclick=toggleTheme;
+  $('newChatBtn').onclick=newChat;
+  $('settingsBtn').onclick=showSettings;
+  $('sendBtn').onclick=()=>sendMsg();
+  $('chatInp').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}};
+  $('chatInp').oninput=function(){this.style.height='40px';this.style.height=Math.min(this.scrollHeight,80)+'px'};
+  // Voice button — pointer events for better Android support
+  const vb=$('vBtn');
+  vb.onpointerdown=e=>{e.preventDefault();startVoice()};
+  vb.onpointerup=e=>{e.preventDefault();stopVoice()};
+  vb.onpointerleave=e=>{stopVoice()};
+  // Speed
+  $$('.spd button').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.s;sv('speed',S.speed);updSpeed()});
+  // Nav
+  $$('.nav-i').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  // Words tabs
+  $$('.w-tab').forEach(b=>b.onclick=()=>{$$('.w-tab').forEach(t=>t.classList.remove('on'));b.classList.add('on');const wt=b.dataset.wt;$('wList').style.display=wt==='list'?'':'none';$('wPhrases').style.display=wt==='phrases'?'':'none';$('wReview').style.display=wt==='review'?'':'none';if(wt==='review')renderReview()});
+  // Shadow buttons
+  $('shListenBtn').onclick=shListen;
+  $('shSpeakBtn').onclick=shSpeak;
+  $('shNextBtn').onclick=shNext;
+  // Show app if key exists
+  if(S.key){
+    $('setup').classList.add('hidden');
+    $('app').classList.add('show');
+    updMode();updSpeed();addWelcome();updStats();loadDaily();loadShadow();renderWords();updStreak();
+  }
+}
+
+/* ===== SETUP ===== */
+async function submitKey(){
+  const k=$('apiKeyInput').value.trim();
+  if(!k)return;
+  $('setupBtn').disabled=true;
+  $('setupErr').textContent='Testing... 測試中...';
+  try{
+    await gem([{role:'user',parts:[{text:'Hi'}]}],k);
+    S.key=k;sv('key',k);
+    $('setup').classList.add('hidden');
+    $('app').classList.add('show');
+    addWelcome();loadDaily();loadShadow();updStats();updStreak();
+  }catch(e){
+    const msg=e.message;
+    if(msg.includes('Quota')||msg.includes('429')){
+      $('setupErr').innerHTML='⚠️ This key\'s quota is exhausted 此金鑰額度已用完<br><b>Solution 解法:</b> Go to <a href="https://aistudio.google.com/apikey" target="_blank">AI Studio</a>, create a NEW key 建立新金鑰';
+    }else if(msg.includes('403')){
+      $('setupErr').textContent='Key not authorized 金鑰未授權。Enable Generative Language API';
+    }else{
+      $('setupErr').textContent='Error 錯誤: '+msg.slice(0,80);
+    }
+  }
+  $('setupBtn').disabled=false;
+}
+
+/* ===== CHAT ===== */
+function addWelcome(){
+  if(S.hist.length>0){
+    S.hist.forEach(m=>dispMsg(m.role,m.text,false));
+    conv=S.hist.map(m=>({role:m.role==='u'?'user':'model',parts:[{text:m.raw||m.text}]}));
+    return;
+  }
+  dispMsg('a',`Hi Roy! 👋 I'm NingNing, your English speaking coach!\n\nYou can:\n• Chat with me freely 自由聊天\n• Try today's scenarios 試試情境題\n• Practice shadowing 練跟讀\n\nWhat would you like to talk about?\n\n📝 嗨 Roy！我是 NingNing，你的英語口說教練！準備好了嗎？`,false);
+}
+
+async function sendMsg(text){
+  text=text||$('chatInp').value.trim();
+  if(!text||busy)return;
+  $('chatInp').value='';$('chatInp').style.height='40px';
+  dispMsg('u',text);
+  conv.push({role:'user',parts:[{text}]});
+  S.hist.push({role:'u',text,raw:text,ts:Date.now()});sv('hist',S.hist);
+  busy=true;
+  const ldg=showLdg();
+  try{
+    // Keep conversation context manageable (last 20 messages)
+    const ctx=conv.length>20?conv.slice(-20):conv;
+    const res=await gem(ctx);
+    ldg.remove();
+    conv.push({role:'model',parts:[{text:res}]});
+    S.hist.push({role:'a',text:res,raw:res,ts:Date.now()});sv('hist',S.hist);
+    dispMsg('a',res);
+    parseVocab(res);parseCorr(res);
+    S.stats.chats++;addXP(10);sv('stats',S.stats);updStats();
+  }catch(e){
+    ldg.remove();
+    dispMsg('a',`Oops! Error occurred. Please try again.\n📝 發生錯誤，請再試一次。\n\n${e.message}`);
+  }
+  busy=false;
+}
+
+function dispMsg(role,text,anim=true){
+  const c=$('msgs');
+  const d=document.createElement('div');
+  d.className=`m ${role==='u'?'u':'a'}`;
+  if(role==='a'){
+    let main=text, corrs=[], vocabs=[];
+    // Extract corrections
+    const cr=/⚠️CORRECTION:([\s\S]*?)(?=⚠️CORRECTION:|📚VOCAB:|$)/g;
+    let m;while((m=cr.exec(text))!==null)corrs.push(m[1].trim());
+    main=main.replace(/⚠️CORRECTION:[\s\S]*?(?=⚠️CORRECTION:|📚VOCAB:|$)/g,'').trim();
+    // Extract vocab
+    const vr=/📚VOCAB:\s*(.+)/g;
+    while((m=vr.exec(text))!==null)vocabs.push(m[1].trim());
+    main=main.replace(/📚VOCAB:\s*.+/g,'').trim();
+    // Bubble
+    const b=document.createElement('div');b.className='bbl';
+    b.innerHTML=main.replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    d.appendChild(b);
+    // Actions
+    const acts=document.createElement('div');acts.className='m-acts';
+    const speakTxt=main.replace(/📝[^\n]*/g,'').trim();
+    const listenBtn=document.createElement('button');
+    listenBtn.className='m-act';listenBtn.textContent='🔊 Listen';
+    listenBtn.onclick=()=>speak(speakTxt);
+    acts.appendChild(listenBtn);
+    // Vocab buttons
+    vocabs.forEach(v=>{
+      const p=v.match(/(.+?)\s*\((.+?)\)\s*=\s*(.+?)(?:\|(.+))?$/);
+      if(p){
+        const vb=document.createElement('button');vb.className='m-act';vb.style.color='var(--blue)';
+        vb.textContent=`📚 ${p[1].trim()}`;
+        vb.onclick=()=>saveWord(p[1].trim(),p[2].trim(),p[3].trim(),p[4]?.trim()||'');
+        acts.appendChild(vb);
+      }
+    });
+    d.appendChild(acts);
+    // Corrections
+    corrs.forEach(c=>{
+      const card=document.createElement('div');card.className='corr';
+      const wm=c.match(/❌\s*(.+)/), rm=c.match(/✅\s*(.+)/), tm=c.match(/💡\s*(.+)/), cm=c.match(/📝\s*(.+)/);
+      card.innerHTML=`<div class="corr-h">⚠️ Correction 糾正</div>`
+        +(wm?`<div class="corr-w">${esc(wm[1])}</div>`:'')
+        +(rm?`<div class="corr-r">${esc(rm[1])}</div>`:'')
+        +(tm?`<div class="corr-t">${esc(tm[1])}${cm?'<br>'+esc(cm[1]):''}</div>`:'');
+      if(rm){
+        const lb=document.createElement('button');lb.className='corr-listen';lb.textContent='🔊 Hear correct version 聽正確版';
+        lb.onclick=()=>speak(rm[1]);
+        card.appendChild(lb);
+      }
+      d.appendChild(card);
+    });
+  }else{
+    const b=document.createElement('div');b.className='bbl';b.textContent=text;d.appendChild(b);
+  }
+  c.appendChild(d);
+  if(anim)requestAnimationFrame(()=>{const t=$('tab-chat');t.scrollTop=t.scrollHeight});
+}
+
+function esc(s){return s.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function showLdg(){
+  const c=$('msgs');
+  const d=document.createElement('div');d.className='m a';
+  d.innerHTML='<div class="ldg"><span></span><span></span><span></span></div>';
+  c.appendChild(d);
+  $('tab-chat').scrollTop=$('tab-chat').scrollHeight;
+  return d;
+}
+
+function newChat(){
+  if(S.hist.length>0&&!confirm('Start new conversation?\n開始新對話？'))return;
+  S.hist=[];conv=[];sv('hist',[]);$('msgs').innerHTML='';addWelcome();
+}
+
+/* ===== VOICE ===== */
+function initRecog(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR)return null;
+  recog=new SR();
+  recog.lang='en-US';recog.interimResults=false;recog.continuous=false;
+  recog.onresult=e=>{
+    const t=e.results[0][0].transcript;
+    $('chatInp').value=t;
+    sendMsg(t);
+  };
+  recog.onerror=e=>{
+    console.warn('Speech error:',e.error);
+    $('vBtn').classList.remove('rec');
+    if(e.error==='not-allowed')toast('Allow microphone 請允許麥克風');
+    else if(e.error==='no-speech')toast('No speech detected 未偵測到語音');
+  };
+  recog.onend=()=>$('vBtn').classList.remove('rec');
+  return recog;
+}
+
+function startVoice(){
+  if(!recog)initRecog();
+  if(!recog){toast('Voice not supported 語音不支援');return}
+  try{recog.start();$('vBtn').classList.add('rec')}catch(e){}
+}
+function stopVoice(){
+  if(recog)try{recog.stop()}catch(e){}
+  $('vBtn').classList.remove('rec');
+}
+
+function speak(text,rate){
+  if(!window.speechSynthesis)return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-US';u.rate=rate||S.speed;u.pitch=1.05;
+  const v=speechSynthesis.getVoices();
+  const pref=v.find(x=>x.lang==='en-US'&&x.name.includes('Google'))||v.find(x=>x.lang.startsWith('en-US'))||v.find(x=>x.lang.startsWith('en'));
+  if(pref)u.voice=pref;
+  speechSynthesis.speak(u);
+}
+if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
+
+/* ===== SPEED ===== */
+function updSpeed(){$$('.spd button').forEach(b=>b.classList.toggle('on',+b.dataset.s===S.speed))}
+
+/* ===== MODE ===== */
+function toggleMode(){
+  S.mode=S.mode==='gentle'?'strict':'gentle';sv('mode',S.mode);updMode();
+  toast(S.mode==='gentle'?'Gentle — major errors only 溫和模式':'Strict — all corrections 嚴格模式');
+}
+function updMode(){const b=$('modeBadge');b.textContent=S.mode==='gentle'?'Gentle':'Strict';b.className='badge'+(S.mode==='strict'?' strict':'')}
+
+/* ===== THEME ===== */
+function toggleTheme(){
+  S.theme=S.theme==='light'?'dark':'light';sv('theme',S.theme);
+  document.documentElement.setAttribute('data-theme',S.theme==='dark'?'dark':'');
+  $('themeBtn').textContent=S.theme==='dark'?'☀️':'🌙';
+}
+
+/* ===== DAILY SCENARIOS ===== */
+async function loadDaily(){
+  const today=new Date().toISOString().split('T')[0];
+  $('dDate').textContent=today;
+  if(S.daily.date===today&&S.daily.items){renderDaily(S.daily.items);return}
+  try{
+    const prompt=`Generate 3 English practice scenarios for a TMGM Client Manager in Taipei (beginner English).
+Return ONLY valid JSON array, no markdown fences:
+[{"cat":"Work","icon":"🏢","title":"...","title_cn":"...","desc":"...","desc_cn":"...","phrases":["...","...","..."]}]
+Categories: 1=Work, 1=Social, 1=Daily. Make them practical and relevant to financial services in Taipei.`;
+    const res=await gem([{role:'user',parts:[{text:prompt}]}]);
+    const jm=res.match(/\[[\s\S]*\]/);
+    if(jm){
+      const items=JSON.parse(jm[0]);
+      S.daily={date:today,items,done:[]};sv('daily',S.daily);
+      renderDaily(items);
+    }else throw new Error('Bad JSON');
+  }catch(e){
+    $('dScenarios').innerHTML=`<div style="text-align:center;padding:20px;color:var(--error)">Load failed 載入失敗<br><button onclick="loadDaily()" style="margin-top:8px;padding:8px 16px;border:none;background:var(--blue);color:#fff;border-radius:8px;cursor:pointer">Retry 重試</button></div>`;
+  }
+}
+
+function renderDaily(items){
+  const done=S.daily.done||[];
+  $('dScenarios').innerHTML=items.map((s,i)=>`
+    <div class="sc ${done.includes(i)?'done':''}">
+      <div class="sc-icon">${s.icon||'📋'}</div>
+      <div class="sc-cat">${s.cat||s.category||'Practice'}</div>
+      <div class="sc-txt">${s.title}</div>
+      <div class="sc-cn">${s.title_cn}</div>
+      <div style="font-size:13px;color:var(--text-light);margin-bottom:8px;line-height:1.4">${s.desc||s.description||''}<br>${s.desc_cn||s.description_cn||''}</div>
+      <div class="sc-ph"><div class="sc-ph-t">💡 Useful phrases:</div>${(s.phrases||[]).map(p=>`<div class="sc-ph-i">• ${p}</div>`).join('')}</div>
+      <button class="sc-go" onclick="startScen(${i})">${done.includes(i)?'✅ Done 已完成':'🎤 Start 開始'}</button>
+    </div>
+  `).join('');
+}
+
+function startScen(i){
+  const s=S.daily.items[i];
+  switchTab('chat');
+  sendMsg(`Let's practice: "${s.title}" — ${s.desc||s.description||''}. Start the roleplay, you be the other person.`);
+  if(!S.daily.done)S.daily.done=[];
+  if(!S.daily.done.includes(i)){S.daily.done.push(i);S.stats.scen++;addXP(20);sv('daily',S.daily);sv('stats',S.stats);updStats()}
+}
+
+/* ===== SHADOWING ===== */
+const SH=[
+  {en:"Hi, nice to meet you. I'm Roy from TMGM.",cn:"嗨，很高興認識你。我是 TMGM 的 Roy。",lv:1},
+  {en:"How are you doing today?",cn:"你今天好嗎？",lv:1},
+  {en:"I work as a client manager in Taipei.",cn:"我在台北當客戶經理。",lv:1},
+  {en:"Could you speak a little slower, please?",cn:"可以說慢一點嗎？",lv:1},
+  {en:"Sorry, could you repeat that?",cn:"抱歉，可以重複一次嗎？",lv:1},
+  {en:"I'd like to schedule a meeting with you.",cn:"我想跟你安排一個會議。",lv:2},
+  {en:"Let me update you on the project status.",cn:"讓我更新一下專案進度。",lv:2},
+  {en:"The account opening takes about three business days.",cn:"開戶大約需要三個工作天。",lv:2},
+  {en:"I'll send you the report by end of day.",cn:"我今天結束前把報告寄給你。",lv:2},
+  {en:"Do you have any questions about the platform?",cn:"你對平台有任何問題嗎？",lv:2},
+  {en:"Thank you for your patience. We're resolving the issue.",cn:"感謝耐心。我們正在處理。",lv:3},
+  {en:"I'd like to follow up on our previous conversation.",cn:"我想跟進之前的對話。",lv:3},
+  {en:"Could you provide additional documentation for verification?",cn:"可以提供額外文件做驗證嗎？",lv:3},
+  {en:"I apologize for the delay. Compliance is reviewing your application.",cn:"抱歉延遲，合規團隊正在審核。",lv:3},
+  {en:"Let me walk you through the deposit process.",cn:"讓我帶你了解存款流程。",lv:3},
+  {en:"What do you do for a living?",cn:"你是做什麼工作的？",lv:4},
+  {en:"I've been living in Taipei for about five years.",cn:"我在台北住了大約五年。",lv:4},
+  {en:"Have you tried the night market food? It's amazing!",cn:"你試過夜市美食嗎？超好吃！",lv:4},
+  {en:"Would you like to grab coffee sometime?",cn:"找時間喝杯咖啡？",lv:4},
+  {en:"What are your plans for the weekend?",cn:"你週末有什麼計劃？",lv:4},
+];
+const LV_NAMES={1:'Basics 基礎',2:'Work 工作',3:'Clients 客戶',4:'Social 社交'};
+
+function loadShadow(){
+  if(S.shIdx>=SH.length)S.shIdx=0;
+  const s=SH[S.shIdx];
+  $('shEn').textContent=s.en;$('shCn').textContent=s.cn;
+  $('shRes').style.display='none';
+  $('shLvlText').textContent=`Level ${s.lv} — ${LV_NAMES[s.lv]}`;
+  $('shProg').style.width=(S.shIdx/SH.length*100)+'%';
+}
+function shListen(){speak(SH[S.shIdx].en)}
+function shSpeak(){
+  if(!recog)initRecog();
+  if(!recog){toast('Voice not supported');return}
+  const origHandler=recog.onresult;
+  recog.onresult=e=>{
+    const t=e.results[0][0].transcript;
+    compareSh(t);
+    recog.onresult=origHandler;
+  };
+  try{recog.start();toast('🎤 Listening... 聆聽中')}catch(e){}
+}
+function compareSh(attempt){
+  const s=SH[S.shIdx];
+  const orig=s.en.toLowerCase().replace(/[^a-z\s']/g,'').split(/\s+/);
+  const spoken=attempt.toLowerCase().replace(/[^a-z\s']/g,'').split(/\s+/);
+  let html='';
+  orig.forEach((w,i)=>{
+    html+=spoken[i]&&spoken[i]===w?`<span class="ok">${w}</span> `:`<span class="no">${w}</span> `;
+  });
+  const correct=orig.filter((w,i)=>spoken[i]===w).length;
+  const pct=Math.round(correct/orig.length*100);
+  $('shAtt').textContent=`"${attempt}" — ${pct}% match`;
+  $('shDiff').innerHTML='Target: '+html;
+  $('shRes').style.display='block';
+  S.stats.shad++;addXP(15);sv('stats',S.stats);updStats();
+}
+function shNext(){S.shIdx++;if(S.shIdx>=SH.length)S.shIdx=0;sv('shIdx',S.shIdx);loadShadow()}
+
+/* ===== VOCABULARY ===== */
+function parseVocab(text){/* vocab buttons are in dispMsg */}
+function parseCorr(text){
+  const r=/❌\s*(.+)/g;let m;
+  while((m=r.exec(text))!==null){
+    const k=m[1].trim().toLowerCase().slice(0,50);
+    if(!S.stats.mis)S.stats.mis={};
+    S.stats.mis[k]=(S.stats.mis[k]||0)+1;
+  }
+  sv('stats',S.stats);updStats();
+}
+function saveWord(word,type,meaning,example){
+  if(S.vocab.find(v=>v.w.toLowerCase()===word.toLowerCase())){toast('Already saved 已存過');return}
+  S.vocab.push({w:word,t:type,m:meaning,e:example,d:new Date().toISOString().split('T')[0],r:0});
+  sv('vocab',S.vocab);renderWords();toast(`Saved: ${word} ✓`);
+  S.stats.words=S.vocab.length;sv('stats',S.stats);updStats();
+}
+function delWord(i){S.vocab.splice(i,1);sv('vocab',S.vocab);renderWords()}
+
+function renderWords(){
+  $('wCnt').textContent=`${S.vocab.length} words`;
+  const wl=$('wList');
+  if(!S.vocab.length){wl.innerHTML='<div class="w-empty"><div class="w-empty-ico">📖</div>No words yet!<br>跟 NingNing 聊天，點 📚 存生詞</div>';
+  }else{
+    wl.innerHTML=S.vocab.map((v,i)=>`<div class="wc"><div class="wc-en">${esc(v.w)} <span class="wc-type">${esc(v.t)}</span></div><div class="wc-cn">${esc(v.m)}</div>${v.e?`<div class="wc-ex">${esc(v.e)}</div>`:''}<div class="wc-acts"><button class="wc-a" onclick="speak('${v.w.replace(/'/g,"\\'")}')">🔊</button><button class="wc-a" onclick="delWord(${i})">🗑️</button></div></div>`).join('');
+  }
+  const wp=$('wPhrases');
+  if(!S.phrases.length){wp.innerHTML='<div class="w-empty"><div class="w-empty-ico">💬</div>No phrases yet 還沒有句子</div>';
+  }else{
+    wp.innerHTML=S.phrases.map((p,i)=>`<div class="wc"><div class="wc-en">${esc(p.p)}</div><div class="wc-cn">${esc(p.m)}</div><div class="wc-acts"><button class="wc-a" onclick="speak('${p.p.replace(/'/g,"\\'")}')">🔊</button><button class="wc-a" onclick="S.phrases.splice(${i},1);sv('phr',S.phrases);renderWords()">🗑️</button></div></div>`).join('');
+  }
+  renderReview();
+}
+
+let rvIdx=0;
+function renderReview(){
+  const el=$('wReview');
+  if(!S.vocab.length){el.innerHTML='<div class="w-empty"><div class="w-empty-ico">🃏</div>Save words first!<br>先存一些生詞</div>';return}
+  if(rvIdx>=S.vocab.length)rvIdx=0;
+  const v=S.vocab[rvIdx];
+  el.innerHTML=`<div style="text-align:center;font-size:12px;color:var(--text-light);margin-bottom:8px">${rvIdx+1}/${S.vocab.length}</div>
+    <div class="fc" id="fc" onclick="this.classList.toggle('flip')"><div class="fc-in"><div class="fc-f"><div class="fc-word">${esc(v.w)}</div><div class="fc-hint">Tap to flip 點擊翻牌</div></div><div class="fc-b"><div class="fc-mean">${esc(v.m)}</div><div style="font-size:14px;color:var(--text-light)">${esc(v.t)}</div>${v.e?`<div class="fc-ex">${esc(v.e)}</div>`:''}</div></div></div>
+    <div class="rv-ctrl"><button class="rv-b rv-again" onclick="rvIdx++;renderReview()">Again 再來</button><button class="rv-b rv-know" onclick="rvIdx++;renderReview()">Got it 記住了</button></div>`;
+}
+
+/* ===== STATS ===== */
+function addXP(n){S.stats.xp=(S.stats.xp||0)+n;sv('stats',S.stats)}
+function updStreak(){
+  const today=new Date().toISOString().split('T')[0];
+  if(S.stats.last===today)return;
+  const yest=new Date(Date.now()-864e5).toISOString().split('T')[0];
+  S.stats.streak=S.stats.last===yest?(S.stats.streak||0)+1:1;
+  S.stats.last=today;sv('stats',S.stats);updStats();
+}
+function updStats(){
+  $('stStreak').textContent=S.stats.streak||0;
+  $('stXP').textContent=S.stats.xp||0;
+  $('stChats').textContent=S.stats.chats||0;
+  $('stScen').textContent=S.stats.scen||0;
+  $('stShad').textContent=S.stats.shad||0;
+  $('stWords').textContent=S.vocab.length;
+  const xp=S.stats.xp||0;
+  let ln,lp;
+  if(xp<100){ln='🌱 Starter 新手';lp=xp}
+  else if(xp<500){ln='🚶 Explorer 探索者';lp=(xp-100)/4}
+  else if(xp<1500){ln='🗣️ Speaker 會說了';lp=(xp-500)/10}
+  else if(xp<5000){ln='💪 Confident 有自信';lp=(xp-1500)/35}
+  else{ln='⭐ Pro 高手';lp=100}
+  $('stLvl').textContent=ln;
+  $('stLvlFill').style.width=Math.min(lp,100)+'%';
+  const mis=S.stats.mis||{};
+  const sorted=Object.entries(mis).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  $('misList').innerHTML=sorted.length?sorted.map(([m,c])=>`<div class="mi"><span>${esc(m)}</span><span>${c}x</span></div>`).join(''):'<div style="color:var(--text-light);font-size:12px;padding:6px 0">Chat to start tracking! 開始聊天追蹤！</div>';
+}
+
+/* ===== NAV ===== */
+function switchTab(tab){
+  $$('.tab').forEach(t=>t.classList.remove('on'));
+  $$('.nav-i').forEach(n=>n.classList.remove('on'));
+  $('tab-'+tab).classList.add('on');
+  document.querySelector(`.nav-i[data-tab="${tab}"]`).classList.add('on');
+  $('inpArea').classList.toggle('on',tab==='chat');
+  if(tab==='chat')requestAnimationFrame(()=>{$('tab-chat').scrollTop=$('tab-chat').scrollHeight});
+}
+
+/* ===== SETTINGS ===== */
+function showSettings(){
+  const r=prompt('Options:\n1 = Change API Key 換金鑰\n2 = Clear all data 清除資料\n3 = Cancel 取消');
+  if(r==='1'){const k=prompt('New API Key:');if(k?.trim()){S.key=k.trim();sv('key',S.key);toast('Key updated 已更新')}}
+  else if(r==='2'){if(confirm('Delete all data?\n刪除所有資料？')){localStorage.clear();location.reload()}}
+}
+
+/* ===== TOAST ===== */
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2300)}
+
+/* ===== SERVICE WORKER ===== */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+}
+
+/* ===== GO ===== */
+init();
+</script>
+</body>
+</html>
