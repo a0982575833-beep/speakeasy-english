@@ -523,21 +523,61 @@ async function sendMsg(text){
   busy=true;
   const ldg=showLdg();
   try{
-    // Keep conversation context manageable (last 20 messages)
     const ctx=conv.length>20?conv.slice(-20):conv;
-    const res=await gem(ctx);
+    // Use streaming API for faster perceived response
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${S.key}`;
+    const r=await fetch(url,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        systemInstruction:{parts:[{text:getSysPrompt()}]},
+        contents:ctx,
+        generationConfig:{temperature:0.8,maxOutputTokens:2048}
+      })
+    });
+    if(!r.ok)throw new Error(`API ${r.status}`);
     ldg.remove();
-    conv.push({role:'model',parts:[{text:res}]});
-    S.hist.push({role:'a',text:res,raw:res,ts:Date.now()});sv('hist',S.hist);
-    dispMsg('a',res);
-    // Auto-speak NingNing's English reply (strip Chinese/correction parts)
-    const speakPart=res.replace(/📝[^\n]*/g,'').replace(/⚠️CORRECTION:[\s\S]*?(?=⚠️|📚|$)/g,'').replace(/📚VOCAB:.*/g,'').trim();
-    if(speakPart&&ttsOn)setTimeout(()=>speak(speakPart),300);
-    parseVocab(res);parseCorr(res);
+    // Stream chunks into a live message bubble
+    const reader=r.body.getReader();
+    const decoder=new TextDecoder();
+    let full='',buf='';
+    // Create AI message container
+    const msgEl=document.createElement('div');msgEl.className='m a';
+    const bblEl=document.createElement('div');bblEl.className='bbl';
+    msgEl.appendChild(bblEl);
+    $('msgs').appendChild(msgEl);
+    const scrollChat=()=>{const t=$('tab-chat');t.scrollTop=t.scrollHeight};
+    scrollChat();
+    while(true){
+      const{done,value}=await reader.read();
+      if(done)break;
+      buf+=decoder.decode(value,{stream:true});
+      // Parse SSE events
+      const lines=buf.split('\n');
+      buf=lines.pop()||'';
+      for(const line of lines){
+        if(!line.startsWith('data: '))continue;
+        const json=line.slice(6).trim();
+        if(json==='[DONE]')continue;
+        try{
+          const d=JSON.parse(json);
+          const chunk=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+          if(chunk){full+=chunk;bblEl.innerHTML=formatStreamText(full);scrollChat()}
+        }catch(e){}
+      }
+    }
+    // Done streaming — rebuild with proper formatting (corrections, vocab, actions)
+    msgEl.remove();
+    conv.push({role:'model',parts:[{text:full}]});
+    S.hist.push({role:'a',text:full,raw:full,ts:Date.now()});sv('hist',S.hist);
+    dispMsg('a',full);
+    // TTS in background (non-blocking)
+    const speakPart=full.replace(/📝[^\n]*/g,'').replace(/⚠️CORRECTION:[\s\S]*?(?=⚠️|📚|$)/g,'').replace(/📚VOCAB:.*/g,'').trim();
+    if(speakPart&&ttsOn)speak(speakPart);
+    parseVocab(full);parseCorr(full);
     S.stats.chats++;addXP(10);sv('stats',S.stats);updStats();
   }catch(e){
     ldg.remove();
-    dispMsg('a',`Oops! Error occurred. Please try again.\n📝 發生錯誤，請再試一次。\n\n${e.message}`);
+    dispMsg('a',`Oops! Error. Please try again.\n📝 發生錯誤，請再試。\n\n${e.message}`);
   }
   busy=false;
 }
@@ -601,6 +641,7 @@ function dispMsg(role,text,anim=true){
 }
 
 function esc(s){return s.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function formatStreamText(t){return t.replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}
 
 function showLdg(){
   const c=$('msgs');
