@@ -524,60 +524,55 @@ async function sendMsg(text){
   const ldg=showLdg();
   try{
     const ctx=conv.length>20?conv.slice(-20):conv;
-    // Use streaming API for faster perceived response
-    const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${S.key}`;
-    const r=await fetch(url,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        systemInstruction:{parts:[{text:getSysPrompt()}]},
-        contents:ctx,
-        generationConfig:{temperature:0.8,maxOutputTokens:2048}
-      })
-    });
-    if(!r.ok)throw new Error(`API ${r.status}`);
-    ldg.remove();
-    // Stream chunks into a live message bubble
-    const reader=r.body.getReader();
-    const decoder=new TextDecoder();
-    let full='',buf='';
-    // Create AI message container
-    const msgEl=document.createElement('div');msgEl.className='m a';
-    const bblEl=document.createElement('div');bblEl.className='bbl';
-    msgEl.appendChild(bblEl);
-    $('msgs').appendChild(msgEl);
-    const scrollChat=()=>{const t=$('tab-chat');t.scrollTop=t.scrollHeight};
-    scrollChat();
-    while(true){
-      const{done,value}=await reader.read();
-      if(done)break;
-      buf+=decoder.decode(value,{stream:true});
-      // Parse SSE events
-      const lines=buf.split('\n');
-      buf=lines.pop()||'';
-      for(const line of lines){
-        if(!line.startsWith('data: '))continue;
-        const json=line.slice(6).trim();
-        if(json==='[DONE]')continue;
-        try{
-          const d=JSON.parse(json);
-          const chunk=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
-          if(chunk){full+=chunk;bblEl.innerHTML=formatStreamText(full);scrollChat()}
-        }catch(e){}
+    let full='';
+    // Try streaming first, fallback to regular
+    try{
+      const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${S.key}`;
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({systemInstruction:{parts:[{text:getSysPrompt()}]},contents:ctx,generationConfig:{temperature:0.8,maxOutputTokens:2048}})
+      });
+      if(!r.ok||!r.body)throw new Error('no stream');
+      const reader=r.body.getReader(),dec=new TextDecoder();
+      let buf='',first=true;
+      const msgEl=document.createElement('div');msgEl.className='m a';
+      const bblEl=document.createElement('div');bblEl.className='bbl';bblEl.textContent='...';
+      msgEl.appendChild(bblEl);
+      while(true){
+        const{done,value}=await reader.read();
+        if(done)break;
+        buf+=dec.decode(value,{stream:true});
+        const lines=buf.split('\n');buf=lines.pop()||'';
+        for(const line of lines){
+          if(!line.startsWith('data: '))continue;
+          const j=line.slice(6).trim();if(j==='[DONE]')continue;
+          try{const chunk=JSON.parse(j).candidates?.[0]?.content?.parts?.[0]?.text||'';
+            if(chunk){
+              if(first){ldg.remove();$('msgs').appendChild(msgEl);first=false}
+              full+=chunk;bblEl.innerHTML=formatStreamText(full);
+              $('tab-chat').scrollTop=$('tab-chat').scrollHeight;
+            }
+          }catch(e){}
+        }
       }
+      if(first)ldg.remove(); // no chunks received
+      msgEl.remove();
+    }catch(e){
+      // Fallback to non-streaming
+      full=await gem(ctx);
+      ldg.remove();
     }
-    // Done streaming — rebuild with proper formatting (corrections, vocab, actions)
-    msgEl.remove();
+    if(!full)throw new Error('Empty response');
     conv.push({role:'model',parts:[{text:full}]});
     S.hist.push({role:'a',text:full,raw:full,ts:Date.now()});sv('hist',S.hist);
     dispMsg('a',full);
-    // TTS in background (non-blocking)
-    const speakPart=full.replace(/📝[^\n]*/g,'').replace(/⚠️CORRECTION:[\s\S]*?(?=⚠️|📚|$)/g,'').replace(/📚VOCAB:.*/g,'').trim();
-    if(speakPart&&ttsOn)speak(speakPart);
+    // TTS in background
+    const sp=full.replace(/📝[^\n]*/g,'').replace(/⚠️CORRECTION:[\s\S]*?(?=⚠️|📚|$)/g,'').replace(/📚VOCAB:.*/g,'').trim();
+    if(sp&&ttsOn)speak(sp);
     parseVocab(full);parseCorr(full);
     S.stats.chats++;addXP(10);sv('stats',S.stats);updStats();
   }catch(e){
     ldg.remove();
-    dispMsg('a',`Oops! Error. Please try again.\n📝 發生錯誤，請再試。\n\n${e.message}`);
+    dispMsg('a',`Oops! Please try again.\n📝 請再試一次。\n\n${e.message}`);
   }
   busy=false;
 }
