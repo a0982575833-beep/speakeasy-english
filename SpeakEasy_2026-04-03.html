@@ -656,15 +656,60 @@ function stopVoice(){
   },300);
 }
 
-function speak(text,rate){
+let currentAudio=null;
+async function speak(text,rate){
+  if(!text)return;
+  // Stop any playing audio
+  if(currentAudio){try{currentAudio.pause();currentAudio=null}catch(e){}}
+  if(window.speechSynthesis)speechSynthesis.cancel();
+  // Try Gemini TTS first (natural voice)
+  if(S.key){
+    try{
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${S.key}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          contents:[{role:'user',parts:[{text:text.slice(0,500)}]}],
+          generationConfig:{
+            responseModalities:['AUDIO'],
+            speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:'Kore'}}}
+          }
+        })
+      });
+      if(!r.ok)throw new Error('TTS API error');
+      const d=await r.json();
+      const b64=d.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if(!b64)throw new Error('No audio data');
+      // Convert PCM to WAV and play
+      const pcm=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+      const wav=pcmToWav(pcm,24000);
+      const blob=new Blob([wav],{type:'audio/wav'});
+      const url=URL.createObjectURL(blob);
+      const audio=new Audio(url);
+      audio.playbackRate=rate||S.speed;
+      currentAudio=audio;
+      audio.onended=()=>{URL.revokeObjectURL(url);currentAudio=null};
+      await audio.play();
+      return;
+    }catch(e){console.warn('Gemini TTS fallback:',e.message)}
+  }
+  // Fallback: browser TTS
   if(!window.speechSynthesis)return;
-  speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text);
   u.lang='en-US';u.rate=rate||S.speed;u.pitch=1.05;
   const v=speechSynthesis.getVoices();
   const pref=v.find(x=>x.lang==='en-US'&&x.name.includes('Google'))||v.find(x=>x.lang.startsWith('en-US'))||v.find(x=>x.lang.startsWith('en'));
   if(pref)u.voice=pref;
   speechSynthesis.speak(u);
+}
+function pcmToWav(pcm,rate){
+  const h=new ArrayBuffer(44),v=new DataView(h),w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  w(0,'RIFF');v.setUint32(4,36+pcm.length,true);w(8,'WAVE');w(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  w(36,'data');v.setUint32(40,pcm.length,true);
+  const out=new Uint8Array(44+pcm.length);
+  out.set(new Uint8Array(h),0);out.set(pcm,44);
+  return out;
 }
 if(window.speechSynthesis)speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
 
