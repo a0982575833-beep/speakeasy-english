@@ -509,6 +509,9 @@ async function sendMsg(text){
     conv.push({role:'model',parts:[{text:res}]});
     S.hist.push({role:'a',text:res,raw:res,ts:Date.now()});sv('hist',S.hist);
     dispMsg('a',res);
+    // Auto-speak NingNing's English reply (strip Chinese/correction parts)
+    const speakPart=res.replace(/📝[^\n]*/g,'').replace(/⚠️CORRECTION:[\s\S]*?(?=⚠️|📚|$)/g,'').replace(/📚VOCAB:.*/g,'').trim();
+    if(speakPart)setTimeout(()=>speak(speakPart),300);
     parseVocab(res);parseCorr(res);
     S.stats.chats++;addXP(10);sv('stats',S.stats);updStats();
   }catch(e){
