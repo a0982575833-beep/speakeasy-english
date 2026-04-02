@@ -318,6 +318,7 @@ button{font-family:inherit}
       </div>
       <button class="v-btn" id="vBtn">🎤</button>
       <button class="lang-tog" id="langTog">EN</button>
+      <button class="lang-tog" id="ttsToggle">🔊</button>
     </div>
   </div>
 
@@ -347,7 +348,7 @@ let S={
   stats:JSON.parse(localStorage.getItem(K+'stats')||'{"streak":0,"xp":0,"chats":0,"scen":0,"shad":0,"last":"","mis":{}}'),
   shIdx:+(localStorage.getItem(K+'shIdx'))||0
 };
-let conv=[], busy=false, recog=null, voiceLang='en-US';
+let conv=[], busy=false, recog=null, voiceLang='en-US', ttsOn=localStorage.getItem(K+'tts')!=='off';
 
 function sv(k,v){localStorage.setItem(K+k,typeof v==='object'?JSON.stringify(v):String(v))}
 
@@ -426,6 +427,17 @@ function init(){
   $('sendBtn').onclick=()=>sendMsg();
   $('chatInp').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}};
   $('chatInp').oninput=function(){this.style.height='40px';this.style.height=Math.min(this.scrollHeight,80)+'px'};
+  // TTS on/off toggle
+  $('ttsToggle').textContent=ttsOn?'🔊':'🔇';
+  $('ttsToggle').classList.toggle('cn',!ttsOn);
+  $('ttsToggle').onclick=()=>{
+    ttsOn=!ttsOn;
+    sv('tts',ttsOn?'on':'off');
+    $('ttsToggle').textContent=ttsOn?'🔊':'🔇';
+    $('ttsToggle').classList.toggle('cn',!ttsOn);
+    if(!ttsOn&&window.speechSynthesis)speechSynthesis.cancel();
+    toast(ttsOn?'Voice ON 語音開':'Voice OFF 語音關 (silent mode 靜音)');
+  };
   // Language toggle for voice
   $('langTog').onclick=()=>{
     voiceLang=voiceLang==='en-US'?'zh-TW':'en-US';
@@ -511,7 +523,7 @@ async function sendMsg(text){
     dispMsg('a',res);
     // Auto-speak NingNing's English reply (strip Chinese/correction parts)
     const speakPart=res.replace(/📝[^\n]*/g,'').replace(/⚠️CORRECTION:[\s\S]*?(?=⚠️|📚|$)/g,'').replace(/📚VOCAB:.*/g,'').trim();
-    if(speakPart)setTimeout(()=>speak(speakPart),300);
+    if(speakPart&&ttsOn)setTimeout(()=>speak(speakPart),300);
     parseVocab(res);parseCorr(res);
     S.stats.chats++;addXP(10);sv('stats',S.stats);updStats();
   }catch(e){
