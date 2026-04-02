@@ -390,7 +390,7 @@ async function gem(messages, key){
     body:JSON.stringify({
       systemInstruction:{parts:[{text:getSysPrompt()}]},
       contents:messages,
-      generationConfig:{temperature:0.8,maxOutputTokens:800}
+      generationConfig:{temperature:0.8,maxOutputTokens:2048}
     })
   });
   if(!r.ok){
@@ -660,10 +660,9 @@ async function loadDaily(){
   $('dDate').textContent=today;
   if(S.daily.date===today&&S.daily.items){renderDaily(S.daily.items);return}
   try{
-    const prompt=`Generate 3 English practice scenarios for a TMGM Client Manager in Taipei (beginner English).
-Return ONLY valid JSON array, no markdown fences:
-[{"cat":"Work","icon":"🏢","title":"...","title_cn":"...","desc":"...","desc_cn":"...","phrases":["...","...","..."]}]
-Categories: 1=Work, 1=Social, 1=Daily. Make them practical and relevant to financial services in Taipei.`;
+    const prompt=`Generate 3 short English practice scenarios. Return ONLY a JSON array, no extra text:
+[{"cat":"Work","icon":"🏢","title":"Report to Boss","title_cn":"向老闆報告","desc":"Explain project delay to your boss","desc_cn":"跟老闆解釋專案延遲","phrases":["I'd like to update you on...","The delay is due to...","We expect to finish by..."]}]
+Rules: 1=Work(TMGM finance), 1=Social(friends/networking), 1=Daily(cafe/taxi/shopping). Keep title under 5 words, desc under 15 words, 3 phrases each. Target: beginner English, Taipei.`;
     const res=await gem([{role:'user',parts:[{text:prompt}]}]);
     const jm=res.match(/\[[\s\S]*\]/);
     if(jm){
