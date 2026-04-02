@@ -658,43 +658,50 @@ function newChat(){
 }
 
 /* ===== VOICE ===== */
+let micHolding=false, voiceSent=false;
 function initRecog(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR)return null;
   recog=new SR();
-  recog.lang=voiceLang;recog.interimResults=true;recog.continuous=true;
+  recog.lang=voiceLang;recog.interimResults=true;recog.continuous=false;
   recog.onresult=e=>{
-    // Combine all results (continuous mode produces multiple)
-    let full='';
-    for(let i=0;i<e.results.length;i++) full+=e.results[i][0].transcript;
-    $('chatInp').value=full;
+    const t=e.results[0][0].transcript;
+    $('chatInp').value=t;
     $('chatInp').style.height='40px';$('chatInp').style.height=Math.min($('chatInp').scrollHeight,80)+'px';
   };
   recog.onerror=e=>{
     console.warn('Speech error:',e.error);
-    $('vBtn').classList.remove('rec');
+    $('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening');
     if(e.error==='not-allowed')toast('Allow microphone 請允許麥克風');
-    else if(e.error==='no-speech')toast('No speech detected 未偵測到語音');
+    else if(e.error==='no-speech'&&micHolding){try{recog.start()}catch(x){}}
   };
-  recog.onend=()=>{$('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening')};
+  recog.onend=()=>{
+    // If user is still holding button, restart to keep listening
+    if(micHolding){try{recog.start()}catch(e){}}
+    else{$('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening')}
+  };
   return recog;
 }
 
 function startVoice(){
   if(!recog)initRecog();
   if(!recog){toast('Voice not supported 語音不支援');return}
+  micHolding=true;voiceSent=false;
   recog.lang=voiceLang;
+  $('chatInp').value='';
   try{recog.start();$('vBtn').classList.add('rec');$('chatInp').classList.add('listening')}catch(e){}
 }
 function stopVoice(){
+  micHolding=false;
   if(recog)try{recog.stop()}catch(e){}
   $('vBtn').classList.remove('rec');$('chatInp').classList.remove('listening');
   setTimeout(()=>{
     const txt=$('chatInp').value.trim();
-    if(!txt)return;
+    if(!txt||voiceSent)return;
+    voiceSent=true;
     if(autoSend){sendMsg(txt)}
     else{$('chatInp').focus();toast('Check & tap ➤ 確認後點送出')}
-  },300);
+  },400);
 }
 
 let currentAudio=null;
