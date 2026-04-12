@@ -347,7 +347,10 @@ let S={
   phrases:JSON.parse(localStorage.getItem(K+'phr')||'[]'),
   daily:JSON.parse(localStorage.getItem(K+'daily')||'{}'),
   stats:JSON.parse(localStorage.getItem(K+'stats')||'{"streak":0,"xp":0,"chats":0,"scen":0,"shad":0,"last":"","mis":{}}'),
-  shIdx:+(localStorage.getItem(K+'shIdx'))||0
+  shIdx:+(localStorage.getItem(K+'shIdx'))||0,
+  voxUrl:localStorage.getItem(K+'voxUrl')||'http://localhost:8809',
+  voxVoice:localStorage.getItem(K+'voxVoice')||'A young woman, gentle and sweet voice, slightly smiling',
+  voxOn:localStorage.getItem(K+'voxOn')!=='off'
 };
 let conv=[], busy=false, recog=null, voiceLang='en-US', ttsOn=localStorage.getItem(K+'tts')!=='off', autoSend=localStorage.getItem(K+'autoSend')!=='off';
 
@@ -700,12 +703,56 @@ function stopVoice(){
 }
 
 let currentAudio=null;
+let voxAvailable=null; // null=unknown, true/false=checked
+async function checkVoxCPM(){
+  if(voxAvailable!==null)return voxAvailable;
+  try{
+    const r=await fetch(S.voxUrl+'/api/status',{signal:AbortSignal.timeout(2000)});
+    const d=await r.json();
+    voxAvailable=d.ready===true;
+  }catch(e){voxAvailable=false}
+  return voxAvailable;
+}
+// Re-check VoxCPM2 availability every 30s
+setInterval(()=>{voxAvailable=null},30000);
+
 async function speak(text,rate){
   if(!text)return;
   // Stop any playing audio
   if(currentAudio){try{currentAudio.pause();currentAudio=null}catch(e){}}
   if(window.speechSynthesis)speechSynthesis.cancel();
-  // Try Gemini TTS first (natural voice)
+
+  // Priority 1: VoxCPM2 local server (natural AI voice)
+  if(S.voxOn && await checkVoxCPM()){
+    try{
+      const r=await fetch(S.voxUrl+'/api/tts',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          text:text.slice(0,500),
+          voice_design:S.voxVoice,
+          cfg_value:2.0,
+          inference_timesteps:10
+        }),
+        signal:AbortSignal.timeout(30000)
+      });
+      if(!r.ok)throw new Error('VoxCPM2 API error');
+      const d=await r.json();
+      if(!d.audio_base64)throw new Error('No audio data');
+      const blob=new Blob(
+        [Uint8Array.from(atob(d.audio_base64),c=>c.charCodeAt(0))],
+        {type:'audio/wav'}
+      );
+      const url=URL.createObjectURL(blob);
+      const audio=new Audio(url);
+      audio.playbackRate=rate||S.speed;
+      currentAudio=audio;
+      audio.onended=()=>{URL.revokeObjectURL(url);currentAudio=null};
+      await audio.play();
+      return;
+    }catch(e){console.warn('VoxCPM2 fallback:',e.message);voxAvailable=false}
+  }
+
+  // Priority 2: Gemini TTS (cloud natural voice)
   if(S.key){
     try{
       const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${S.key}`,{
@@ -735,7 +782,8 @@ async function speak(text,rate){
       return;
     }catch(e){console.warn('Gemini TTS fallback:',e.message)}
   }
-  // Fallback: browser TTS
+
+  // Priority 3: Browser TTS (fallback)
   if(!window.speechSynthesis)return;
   const u=new SpeechSynthesisUtterance(text);
   u.lang='en-US';u.rate=rate||S.speed;u.pitch=1.05;
@@ -966,9 +1014,47 @@ function switchTab(tab){
 
 /* ===== SETTINGS ===== */
 function showSettings(){
-  const r=prompt('Options:\n1 = Change API Key 換金鑰\n2 = Clear all data 清除資料\n3 = Cancel 取消');
+  const voxStatus=voxAvailable===true?'Online':'Offline';
+  const r=prompt(
+    'Options 選項:\n'+
+    '1 = Change API Key 換金鑰\n'+
+    '2 = Clear all data 清除資料\n'+
+    '3 = VoxCPM2 Settings 語音設定 ['+voxStatus+']\n'+
+    '4 = Cancel 取消'
+  );
   if(r==='1'){const k=prompt('New API Key:');if(k?.trim()){S.key=k.trim();sv('key',S.key);toast('Key updated 已更新')}}
   else if(r==='2'){if(confirm('Delete all data?\n刪除所有資料？')){localStorage.clear();location.reload()}}
+  else if(r==='3'){showVoxSettings()}
+}
+function showVoxSettings(){
+  const r=prompt(
+    'VoxCPM2 Settings:\n'+
+    'Status 狀態: '+(voxAvailable?'Online':'Offline')+'\n'+
+    'Server: '+S.voxUrl+'\n'+
+    'Voice 音色: '+S.voxVoice.slice(0,40)+'...\n'+
+    'Enabled 啟用: '+(S.voxOn?'Yes':'No')+'\n\n'+
+    '1 = Toggle ON/OFF 開關\n'+
+    '2 = Change Server URL 改伺服器\n'+
+    '3 = Change Voice 改音色\n'+
+    '4 = Test Connection 測試連線\n'+
+    '5 = Back 返回'
+  );
+  if(r==='1'){S.voxOn=!S.voxOn;sv('voxOn',S.voxOn?'on':'off');voxAvailable=null;toast('VoxCPM2 '+(S.voxOn?'ON 已開啟':'OFF 已關閉'))}
+  else if(r==='2'){const u=prompt('Server URL:',S.voxUrl);if(u?.trim()){S.voxUrl=u.trim();sv('voxUrl',S.voxUrl);voxAvailable=null;toast('URL updated')}}
+  else if(r==='3'){
+    const v=prompt(
+      'Voice Design 語音描述:\n(描述想要的聲音特色)\n\nPresets 預設:\n'+
+      '- A young woman, gentle and sweet voice, slightly smiling\n'+
+      '- A deep male voice, calm and authoritative\n'+
+      '- A cheerful young man, energetic and friendly',
+      S.voxVoice
+    );
+    if(v?.trim()){S.voxVoice=v.trim();sv('voxVoice',S.voxVoice);toast('Voice updated 音色已更新')}
+  }
+  else if(r==='4'){
+    voxAvailable=null;
+    checkVoxCPM().then(ok=>toast(ok?'VoxCPM2 Connected 已連線':'VoxCPM2 Offline 未連線'));
+  }
 }
 
 /* ===== TOAST ===== */
